@@ -10,6 +10,7 @@ Most retail traders depend on a single PCR number, which is often delayed, misin
 
 Using live 5-minute Option Chain data, the system fetches real-time OI, IV, Volume, strike-level data, index prices, and VIX. These inputs are processed through a rule-based logic engine, capable of identifying market scenarios such as:
 
+
 1.Long/Short build-ups
 2.Short covering & long unwinding
 3.Bullish or bearish traps (Smart Money detection)
