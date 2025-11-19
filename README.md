@@ -12,9 +12,15 @@ Using live 5-minute Option Chain data, the system fetches real-time OI, IV, Volu
 
 
 1.Long/Short build-ups
+
 2.Short covering & long unwinding
+
 3.Bullish or bearish traps (Smart Money detection)
+
 4.False PCR signals
+
 5.Breakout/Breakdown possibilities
+
 6.Overbought/Oversold reversal zones
+
 7.Volatile market "danger" periods
