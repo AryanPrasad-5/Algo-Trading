@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Algo-Trading - Real-Time Market Intelligence</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        display: ['Space Grotesk', 'sans-serif'],
+                    },
+                    colors: {
+                        market: {
+                            bg: '#050505',
+                            card: 'rgba(20, 20, 25, 0.6)',
+                            border: 'rgba(255, 255, 255, 0.1)',
+                            green: '#00ff9d',
+                            red: '#ff0055',
+                            accent: '#2962ff'
+                        }
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'fade-in-up': 'fadeInUp 1s ease-out forwards',
+                        'pulse-glow': 'pulseGlow 2s infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        fadeInUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        pulseGlow: {
+                            '0%, 100%': { boxShadow: '0 0 5px #00ff9d' },
+                            '50%': { boxShadow: '0 0 20px #00ff9d' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #050505;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        /* Loading Screen */
+        #welcome-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            background: black;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 1s ease-out, visibility 1s;
+        }
+
+        .typewriter-text {
+            overflow: hidden;
+            border-right: .15em solid orange; 
+            white-space: nowrap; 
+            margin: 0 auto; 
+            letter-spacing: .10em; 
+            animation: 
+                typing 3.5s steps(40, end),
+                blink-caret .75s step-end infinite;
+        }
+
+        @keyframes typing {
+            from { width: 0 }
+            to { width: 100% }
+        }
+        
+        @keyframes blink-caret {
+            from, to { border-color: transparent }
+            50% { border-color: #00ff9d }
+        }
+
+        /* Glassmorphism */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(0, 255, 157, 0.3);
+            transform: translateY(-5px);
+            transition: all 0.3s ease;
+        }
+
+        /* Background Canvas */
+        #market-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.4;
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0a0a0a; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00ff9d; 
+        }
+
+        .neon-text {
+            text-shadow: 0 0 10px rgba(0, 255, 157, 0.5);
+        }
+        
+        /* Dynamic Signal Classes */
+        .signal-buy { color: #00ff9d; }
+        .signal-sell { color: #ff0055; }
+        .signal-neutral { color: #fbbf24; }
+    </style>
+</head>
+<body class="font-sans antialiased">
+
+    <div id="welcome-screen">
+        <div class="text-center px-4">
+            <h1 class="text-7xl md:text-9xl font-display font-bold text-white mb-6 tracking-tighter opacity-0 animate-fade-in-up" style="animation-delay: 0.2s;">
+                Algo-Trading
+            </h1>
+            <div class="h-8 md:h-10 overflow-hidden">
+                <p class="text-lg md:text-xl text-gray-400 font-mono typewriter-text" style="animation-delay: 1s;">
+                    Initializing Neural Networks...
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="market-canvas"></canvas>
+
+    <div id="app-content" class="relative min-h-screen opacity-0 transition-opacity duration-1000">
+        
+        <nav class="fixed w-full z-40 top-0 px-6 py-4 border-b border-white/10 glass-card rounded-none">
+            <div class="max-w-7xl mx-auto flex justify-between items-center">
+                <div class="flex items-center gap-3 cursor-pointer group">
+                    <div class="w-10 h-10 bg-gradient-to-br from-market-green to-blue-600 rounded-lg flex items-center justify-center group-hover:animate-pulse-glow transition-all">
+                        <i class="fa-solid fa-crosshairs text-black text-xl"></i>
+                    </div>
+                    <span class="text-2xl font-display font-bold tracking-wide">Algo-Trading</span>
+                </div>
+                
+                <div class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
+                    <a href="#" class="hover:text-market-green transition-colors">Dashboard</a>
+                    <a href="#" class="hover:text-market-green transition-colors">Analysis</a>
+                </div>
+
+                <div class="flex items-center gap-4 animate-float">
+                    <div id="connection-status" class="flex items-center gap-2 text-xs font-mono text-gray-500">
+                        <span class="w-2 h-2 rounded-full bg-red-500" id="status-dot"></span>
+                        <span id="status-text">OFFLINE</span>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <main class="pt-28 pb-12 px-6 max-w-7xl mx-auto">
+            
+            <header class="mb-16 text-center md:text-left flex flex-col md:flex-row items-center justify-between">
+                <div class="md:w-1/2 mb-8 md:mb-0">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-market-green/30 text-market-green text-xs font-bold uppercase tracking-wider mb-4 animate-pulse">
+                        <span class="w-2 h-2 bg-market-green rounded-full"></span>
+                        Market Live
+                    </div>
+                    <h2 class="text-5xl md:text-6xl font-display font-bold mb-4 leading-tight">
+                        Predict the Future <br>
+                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-market-green to-blue-500 neon-text">Within Seconds.</span>
+                    </h2>
+                    <p class="text-gray-400 text-lg max-w-lg leading-relaxed">
+                        Hybrid AI model engaged. Combining Rule-based logic with Machine Learning for high-precision NIFTY signals.
+                    </p>
+                </div>
+                
+                <div class="md:w-5/12 glass-card rounded-2xl p-6 border border-market-green/20 transform rotate-y-12 hover:rotate-0 transition-transform duration-500 perspective-1000">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-gray-400 text-sm uppercase tracking-widest">NIFTY 50 Prediction</h3>
+                        <span class="text-gray-500 font-mono text-xs" id="last-updated">WAITING FOR DATA...</span>
+                    </div>
+                    
+                    <div class="flex items-end gap-4 mb-2">
+                        <span class="text-4xl font-bold text-white" id="api-price">Loading...</span>
+                        
+                        <span class="text-sm font-bold mb-1 flex items-center gap-1" id="api-signal-container">
+                            <i class="fa-solid fa-circle-notch fa-spin" id="api-icon"></i> 
+                            <span id="api-signal">CONNECTING</span>
+                        </span>
+                    </div>
+
+                    <div class="mt-4">
+                        <div class="flex justify-between text-xs text-gray-400 mb-1">
+                            <span>AI Confidence</span>
+                            <span id="api-confidence">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-700 h-2 rounded-full overflow-hidden">
+                            <div id="confidence-bar" class="bg-market-green h-full transition-all duration-1000" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                <div class="glass-card rounded-2xl p-8 cursor-pointer group relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <i class="fa-solid fa-chart-line text-9xl text-market-green transform translate-x-4 -translate-y-4"></i>
+                    </div>
+                    <div class="w-12 h-12 rounded-full bg-market-green/10 flex items-center justify-center mb-6 group-hover:bg-market-green group-hover:text-black transition-colors text-market-green border border-market-green/20">
+                        <i class="fa-solid fa-calculator text-xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-2">Real-Time PCR</h3>
+                    <div class="text-4xl font-mono font-bold text-white mb-2" id="api-pcr">--.--</div>
+                    <p class="text-gray-400 text-sm">
+                        Put-Call Ratio (OI). Values > 1.2 indicate Bullishness. Values < 0.6 indicate Bearishness.
+                    </p>
+                </div>
+
+                <div class="glass-card rounded-2xl p-8 cursor-pointer group relative overflow-hidden lg:col-span-2">
+                    <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <i class="fa-solid fa-brain text-9xl text-yellow-500 transform translate-x-4 -translate-y-4"></i>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-full bg-yellow-500/10 flex items-center justify-center mb-6 text-yellow-500 border border-yellow-500/20 shrink-0">
+                            <i class="fa-solid fa-microchip text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-2xl font-bold mb-2 group-hover:text-yellow-400 transition-colors">AI Logic Engine</h3>
+                            <p class="text-gray-300 text-sm mb-4">
+                                Why did the model take this decision?
+                            </p>
+                            <ul id="api-reasons" class="space-y-2 text-sm text-yellow-100/80 font-mono">
+                                <li><i class="fa-solid fa-spinner fa-spin"></i> Waiting for market analysis...</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-2xl p-8 cursor-pointer group relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <i class="fa-solid fa-table-cells text-9xl text-blue-500 transform translate-x-4 -translate-y-4"></i>
+                    </div>
+                    <div class="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center mb-6 text-blue-500 border border-blue-500/20">
+                        <i class="fa-solid fa-list-ol text-xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-2">Option Chain</h3>
+                    <p class="text-gray-400 text-sm mb-6">
+                        View Open Interest buildup across all strikes.
+                    </p>
+                    <span class="text-sm font-bold flex items-center gap-2 text-blue-400">
+                        Coming Soon
+                    </span>
+                </div>
+            </div>
+        </main>
+
+        <footer class="border-t border-white/10 mt-12 py-8 text-center text-gray-500 text-sm">
+            <p>&copy; 2025 Target Financial Technologies. Powered by Hybrid-AI.</p>
+        </footer>
+    </div>
+
+    <script>
+        // --- 1. UI ANIMATION LOGIC ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const welcomeScreen = document.getElementById('welcome-screen');
+            const appContent = document.getElementById('app-content');
+            
+            setTimeout(() => {
+                welcomeScreen.style.opacity = '0';
+                welcomeScreen.style.visibility = 'hidden';
+                appContent.style.opacity = '1';
+                requestAnimationFrame(animate);
+                
+                // START FETCHING DATA AFTER ANIMATION
+                initDataFetching(); 
+            }, 3000);
+        });
+
+        // --- 2. CANVAS BACKGROUND (Matrix Rain / Stock Lines) ---
+        const canvas = document.getElementById('market-canvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class StockLine {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = 0;
+                this.y = Math.random() * canvas.height;
+                this.speed = Math.random() * 2 + 1;
+                this.color = Math.random() > 0.5 ? '#00ff9d' : '#ff0055'; 
+                this.lineWidth = Math.random() * 2 + 0.5;
+                this.points = [];
+                this.maxLength = Math.random() * 100 + 50; 
+            }
+            update() {
+                this.x += this.speed;
+                this.y += (Math.random() - 0.5) * 20; 
+                if (this.y < 0 || this.y > canvas.height) this.y = Math.random() * canvas.height;
+                this.points.push({x: this.x, y: this.y});
+                if (this.points.length > this.maxLength) this.points.shift();
+                if (this.x > canvas.width) { this.reset(); this.x = 0; }
+            }
+            draw() {
+                if (this.points.length < 2) return;
+                ctx.beginPath();
+                ctx.lineWidth = this.lineWidth;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                const gradient = ctx.createLinearGradient(
+                    this.points[0].x, this.points[0].y,
+                    this.points[this.points.length - 1].x, this.points[this.points.length - 1].y
+                );
+                gradient.addColorStop(0, `rgba(0,0,0,0)`);
+                gradient.addColorStop(1, this.color);
+                ctx.strokeStyle = gradient;
+                ctx.moveTo(this.points[0].x, this.points[0].y);
+                for (let i = 1; i < this.points.length; i++) {
+                    ctx.lineTo(this.points[i].x, this.points[i].y);
+                }
+                ctx.stroke();
+            }
+        }
+
+        const lines = [];
+        for (let i = 0; i < 15; i++) lines.push(new StockLine());
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            lines.forEach(line => { line.update(); line.draw(); });
+            requestAnimationFrame(animate);
+        }
+
+        // --- 3. API INTEGRATION LOGIC (THE BRAIN) ---
+        const API_URL = "http://127.0.0.1:8000/predict/latest";
+
+        async function initDataFetching() {
+            fetchData(); // Fetch immediately
+            setInterval(fetchData, 5000); // Fetch every 5 seconds
+        }
+
+        async function fetchData() {
+            const statusDot = document.getElementById('status-dot');
+            const statusText = document.getElementById('status-text');
+
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) throw new Error("Network response was not ok");
+                const data = await response.json();
+
+                // Update Status
+                statusDot.classList.remove('bg-red-500');
+                statusDot.classList.add('bg-market-green', 'animate-pulse');
+                statusText.innerText = "SYSTEM ONLINE";
+                statusText.classList.add('text-market-green');
+
+                updateUI(data);
+
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                // Update Status to Offline
+                statusDot.classList.remove('bg-market-green', 'animate-pulse');
+                statusDot.classList.add('bg-red-500');
+                statusText.innerText = "DISCONNECTED";
+                statusText.classList.remove('text-market-green');
+            }
+        }
+
+        function updateUI(data) {
+            // 1. Update Timestamp
+            const date = new Date(data.timestamp);
+            document.getElementById('last-updated').innerText = date.toLocaleTimeString();
+
+            // 2. Update Price
+            document.getElementById('api-price').innerText = data.price.toFixed(2);
+
+            // 3. Update Signal & Icon
+            const signalEl = document.getElementById('api-signal');
+            const iconEl = document.getElementById('api-icon');
+            
+            signalEl.innerText = data.signal.replace('_', ' ');
+            
+            // Reset colors
+            const container = document.getElementById('api-signal-container');
+            container.classList.remove('text-market-green', 'text-red-500', 'text-yellow-400');
+
+            if (data.signal.includes('BUY')) {
+                container.classList.add('text-market-green');
+                iconEl.className = "fa-solid fa-arrow-trend-up";
+            } else if (data.signal.includes('SELL')) {
+                container.classList.add('text-red-500');
+                iconEl.className = "fa-solid fa-arrow-trend-down";
+            } else {
+                container.classList.add('text-yellow-400');
+                iconEl.className = "fa-solid fa-minus";
+            }
+
+            // 4. Update Confidence
+            const confPercent = Math.round(data.confidence * 100);
+            document.getElementById('api-confidence').innerText = confPercent + "%";
+            document.getElementById('confidence-bar').style.width = confPercent + "%";
+
+            // 5. Update PCR
+            document.getElementById('api-pcr').innerText = data.features.pcr.toFixed(2);
+
+            // 6. Update AI Reasons
+            const reasonsList = document.getElementById('api-reasons');
+            reasonsList.innerHTML = ""; // Clear old reasons
+            
+            if (data.features.reasons && data.features.reasons.length > 0) {
+                data.features.reasons.forEach(reason => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<i class="fa-solid fa-check text-yellow-500 mr-2"></i> ${reason}`;
+                    reasonsList.appendChild(li);
+                });
+            } else {
+                reasonsList.innerHTML = `<li><i class="fa-solid fa-info-circle mr-2"></i> No active triggers (Neutral Market)</li>`;
+            }
+        }
+    </script>
+</body>
+</html>
